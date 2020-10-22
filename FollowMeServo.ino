@@ -4,15 +4,15 @@ Servo myservo;  // create servo object to control a servo
 // 16 servo objects can be created on the ESP32
 
 // Recommended PWM GPIO pins on the ESP32 include 2,4,12-19,21-23,25-27,32-33
-const int servoPin = 18;
-const int potPin = 34;
+const int servoPin = 13;
+const int potPin = 25;
 const int ledPin = 2;
 const int buttonPin = 0;
 
 int updateIntervalMs = 100;
 long updateAtMs = 0;
 
-#define TAPE_SIZE 100
+#define TAPE_SIZE 50
 int tape[TAPE_SIZE];
 int tapeHeadPos = 0;
 
@@ -30,8 +30,12 @@ long lastChangeAtMs = 0;
 int noChangeRecordingTimeoutMS = 1000;
 
 void setup() {
-  Serial.begin(9600);
-
+  Serial.begin(115200);
+  pinMode(26, OUTPUT);
+  digitalWrite(26, 1);
+  pinMode(33, OUTPUT);
+  digitalWrite(33, 0);
+  
   pinMode(ledPin, OUTPUT);
   pinMode(buttonPin, INPUT);
 
@@ -49,6 +53,7 @@ void setup() {
 
 void loop() {
   if (millis() > updateAtMs) {
+    Serial.println(analogRead(potPin));
     updateAtMs = millis() + updateIntervalMs;
 
     digitalWrite(ledPin, tapeHeadPos == 0);
