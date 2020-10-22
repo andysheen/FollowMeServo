@@ -1,9 +1,7 @@
 #include <ESP32Servo.h>
 
-Servo myservo;  // create servo object to control a servo
-// 16 servo objects can be created on the ESP32
+Servo myservo;
 
-// Recommended PWM GPIO pins on the ESP32 include 2,4,12-19,21-23,25-27,32-33
 const int servoPin = 13;
 const int potPin = 25;
 const int ledPin = 2;
@@ -59,7 +57,7 @@ void loop() {
     digitalWrite(ledPin, tapeHeadPos == 0);
 
     int inputValue = min(255, (int)(map(analogRead(potPin), 0, 4095, 0, 255) + map(digitalRead(buttonPin), 1, 0, 0, 255)));
-    Serial.println(inputValue);
+    updateState(inputValue);
 
     switch(currentState) {
       case RECORD:
@@ -75,8 +73,6 @@ void loop() {
         break;
     }
     tapeHeadPos = (tapeHeadPos + 1) % TAPE_SIZE;
-
-    updateState(inputValue);
   }
 }
 
