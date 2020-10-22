@@ -6,6 +6,8 @@ Servo myservo;  // create servo object to control a servo
 // Recommended PWM GPIO pins on the ESP32 include 2,4,12-19,21-23,25-27,32-33
 const int servoPin = 18;
 const int potPin = 34;
+const int ledPin = 2;
+const int buttonPin = 0;
 
 int updateIntervalMs = 100;
 long updateAtMs = 0;
@@ -21,14 +23,17 @@ typedef enum {
 } State;
 State currentState = INACTIVE;
 
-int lastPotReading = 0;
-int potReadingChangedThreshold = 50;
+int lastInputValue = 0;
+int inputValueChangedThreshold = 5;
 
 long lastChangeAtMs = 0;
 int noChangeRecordingTimeoutMS = 1000;
 
 void setup() {
   Serial.begin(9600);
+
+  pinMode(ledPin, OUTPUT);
+  pinMode(buttonPin, INPUT);
 
   // Allow allocation of all timers
   ESP32PWM::allocateTimer(0);
@@ -38,23 +43,27 @@ void setup() {
   myservo.setPeriodHertz(50);
   myservo.attach(servoPin, 100, 2500);
 
-  lastPotReading = analogRead(potPin);
+  lastInputValue = -1;
   currentState = INACTIVE;
 }
 
 void loop() {
   if (millis() > updateAtMs) {
     updateAtMs = millis() + updateIntervalMs;
-    
+
+    digitalWrite(ledPin, tapeHeadPos == 0);
+
+    int inputValue = min(255, (int)(map(analogRead(potPin), 0, 4095, 0, 255) + map(digitalRead(buttonPin), 1, 0, 0, 255)));
+    Serial.println(inputValue);
+
     switch(currentState) {
       case RECORD:
         Serial.println("RECORD");
-        tape[tapeHeadPos] = analogRead(potPin);
-        myservo.write(map(tape[tapeHeadPos], 0, 4095, 0, 180));
+        record(inputValue);
         break;
       case PLAY:
         Serial.println("PLAY");
-        myservo.write(map(tape[tapeHeadPos], 0, 4095, 0, 180));
+        play(tape[tapeHeadPos]);
         break;
       case INACTIVE:
         Serial.println("INACTIVE");
@@ -62,36 +71,45 @@ void loop() {
     }
     tapeHeadPos = (tapeHeadPos + 1) % TAPE_SIZE;
 
-    updateState();
+    updateState(inputValue);
   }
 }
 
-void updateState() { 
-  int potReading = analogRead(potPin);
-  
-  if(abs(potReading-lastPotReading) > potReadingChangedThreshold) {
-    //Serial.println("CHANGE");
-    lastChangeAtMs = millis();
+void record(int inputValue) {
+  tape[tapeHeadPos] = inputValue;
+  play(inputValue);
+}
 
-    switch(currentState) {
-      case RECORD:    break;
-      case PLAY:
-        currentState = RECORD;
-        break;
-      case INACTIVE:
-        currentState = RECORD;
-        break;
+void play(int inputValue) {
+  myservo.write(map(inputValue, 0, 255, 0, 180));
+}
+
+void updateState(int inputValue) {
+  if(lastInputValue >= 0) {
+    if(abs(inputValue-lastInputValue) > inputValueChangedThreshold) {
+      //Serial.println("CHANGE");
+      lastChangeAtMs = millis();
+  
+      switch(currentState) {
+        case RECORD:    break;
+        case PLAY:
+          currentState = RECORD;
+          break;
+        case INACTIVE:
+          currentState = RECORD;
+          break;
+      }
+    }
+    else if((millis() - lastChangeAtMs) > noChangeRecordingTimeoutMS) {
+      //Serial.println("TIMEOUT");
+      switch(currentState) {
+        case RECORD:
+          currentState = PLAY;
+          break;
+        case PLAY:      break;
+        case INACTIVE:  break;
+      }
     }
   }
-  else if((millis() - lastChangeAtMs) > noChangeRecordingTimeoutMS) {
-    //Serial.println("TIMEOUT");
-    switch(currentState) {
-      case RECORD:
-        currentState = PLAY;
-        break;
-      case PLAY:      break;
-      case INACTIVE:  break;
-    }
-  }
-  lastPotReading = potReading;
+  lastInputValue = inputValue;
 }
